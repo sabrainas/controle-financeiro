@@ -1,0 +1,13 @@
+/* App Styles */
+body {
+  margin: 0;
+  padding: 0;
+}
+
+#root {
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* Tailwind styles will handle most of the styling */
+
