@@ -11,17 +11,21 @@ export function BudgetSetup({ onBudgetCreated }: BudgetSetupProps) {
 
   const handleSubmit = (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
-    
-    if (!amount || Number(amount) <= 0) {
+
+    // Normalizar entrada: remover pontos e converter vírgula para ponto
+    const cleaned = amount.replaceAll('.', '').replace(',', '.').replaceAll(/[^0-9.]/g, '');
+    const parsed = cleaned === '' ? 0 : Number.parseFloat(cleaned);
+
+    if (!parsed || parsed <= 0) {
       alert('Por favor, insira um valor válido');
       return;
     }
 
     setIsLoading(true);
     const monthYear = FinancialService.getCurrentMonthYear();
-    const budget = FinancialService.createBudget(Number(amount), monthYear);
+    const budget = FinancialService.createBudget(parsed, monthYear);
     setIsLoading(false);
-    
+
     setAmount('');
     onBudgetCreated(budget.id);
   };
@@ -37,17 +41,16 @@ export function BudgetSetup({ onBudgetCreated }: BudgetSetupProps) {
             <label htmlFor="amount" className="block text-base lg:text-lg font-bold text-slate-300">
               Quanto você tem para gastar este mês?
             </label>
-            <div className="relative">
-              <span className="absolute left-5 top-5 text-2xl text-slate-400 font-bold">R$</span>
+            <div className="flex items-center bg-slate-700 border-2 border-slate-600 rounded-xl overflow-hidden">
+              <div className="px-4 py-3 bg-slate-800/40 text-slate-300 font-bold text-xl">R$</div>
               <input
                 id="amount"
-                type="number"
-                step="0.01"
-                min="0"
+                type="text"
+                inputMode="decimal"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="0,00"
-                className="w-full pl-14 pr-5 py-6 bg-slate-700 border-2 border-slate-600 rounded-xl text-slate-50 placeholder-slate-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 outline-none transition text-2xl font-bold hover:border-slate-500"
+                className="w-full pl-4 pr-5 py-6 bg-transparent text-slate-50 placeholder-slate-500 focus:outline-none transition text-2xl font-bold"
               />
             </div>
           </div>

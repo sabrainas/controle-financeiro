@@ -9,6 +9,7 @@ export function DailyInputTracker({ budgetId }: DailyInputTrackerProps) {
   const [monthYear, setMonthYear] = useState('');
   const [daysInMonth, setDaysInMonth] = useState(0);
   const [dailyExpenses, setDailyExpenses] = useState<{ [key: string]: number }>({});
+  const [dailyInputStrings, setDailyInputStrings] = useState<{ [key: string]: string }>({});
   const [budget, setBudget] = useState<any>(null);
 
   useEffect(() => {
@@ -36,33 +37,44 @@ export function DailyInputTracker({ budgetId }: DailyInputTrackerProps) {
       });
 
       setDailyExpenses(expenses);
+      // Inicializar as strings de input a partir dos valores carregados (formato BR)
+      const inputStrings: { [key: string]: string } = {};
+      Object.keys(expenses).forEach((d) => {
+        const n = expenses[Number(d)];
+        inputStrings[d] = n > 0 ? n.toFixed(2).replace('.', ',') : '';
+      });
+      setDailyInputStrings(inputStrings);
     }
   }, [budgetId]);
 
+  // Enquanto usuário digita, atualizamos somente a string — não persistor imediatamente
   const handleDayChange = (day: number, rawValue: string) => {
-    // Aceitar entrada com vírgula (BR) ou ponto, remover caracteres inválidos
-  const cleaned = rawValue.replaceAll('.', '').replace(',', '.').replaceAll(/[^0-9.]/g, '');
-  const parsed = cleaned === '' ? 0 : Number.parseFloat(cleaned);
+    setDailyInputStrings((s) => ({ ...s, [day]: rawValue }));
+  };
+
+  // Ao sair do campo (blur) ou pressionar Enter, parseamos e persistimos
+  const handleDayBlur = (day: number) => {
+    const rawValue = dailyInputStrings[day] || '';
+    const cleaned = rawValue.replaceAll('.', '').replace(',', '.').replaceAll(/[^0-9.]/g, '');
+    const parsed = cleaned === '' ? 0 : Number.parseFloat(cleaned);
     const numValue = Number.isFinite(parsed) ? parsed : 0;
 
-    const newExpenses = { ...dailyExpenses, [day]: numValue };
-    setDailyExpenses(newExpenses);
+    // Atualizar estado numérico
+    setDailyExpenses((prev) => ({ ...prev, [day]: numValue }));
 
     if (budget) {
-      // Atualizar no serviço
       const dateStr = `${monthYear}-${String(day).padStart(2, '0')}`;
       const existingExpenses = FinancialService.getExpensesByDate(budget.id, dateStr);
-      
-      // Remover todas as despesas do dia
-      existingExpenses.forEach(expense => {
-        FinancialService.deleteExpense(expense.id);
-      });
-
-      // Adicionar nova despesa se houver valor (não adiciona 0)
+      // Remover despesas antigas
+      existingExpenses.forEach((expense) => FinancialService.deleteExpense(expense.id));
+      // Adicionar nova despesa se houver valor
       if (numValue > 0) {
         FinancialService.addExpense(budget.id, numValue, dateStr, `Gasto do dia`);
       }
     }
+
+    // Normalizar exibição do input após salvar: mostra formato BR ou vazio
+    setDailyInputStrings((s) => ({ ...s, [day]: numValue > 0 ? numValue.toFixed(2).replace('.', ',') : '' }));
   };
 
   if (!budget) {
@@ -151,16 +163,18 @@ export function DailyInputTracker({ budgetId }: DailyInputTrackerProps) {
                   </label>
                   <span className="text-xs md:text-sm text-slate-500 font-semibold">{dayName}</span>
                 </div>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-base md:text-lg text-slate-400 font-bold pointer-events-none z-10">R$</span>
+                <div className="flex items-center bg-slate-700 border-2 border-slate-600 rounded-lg overflow-hidden">
+                  <div className="px-3 md:px-4 py-2 bg-slate-800/40 text-slate-300 font-bold text-sm md:text-base">R$</div>
                   <input
                     id={`day-${day}`}
                     type="text"
                     inputMode="decimal"
-                    value={value}
+                    value={dailyInputStrings[day] ?? value}
                     onChange={(e) => handleDayChange(day, e.target.value)}
+                    onBlur={() => handleDayBlur(day)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { (e.target as HTMLInputElement).blur(); } }}
                     placeholder="0,00"
-                    className="w-full pl-14 pr-4 py-3 md:py-4 bg-slate-700 border-2 border-slate-600 rounded-lg text-slate-50 placeholder-slate-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 outline-none transition text-base md:text-lg font-semibold hover:border-slate-500"
+                    className="w-full pl-4 pr-4 py-3 md:py-4 bg-transparent text-slate-50 placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 transition text-base md:text-lg font-semibold"
                   />
                 </div>
               </div>
